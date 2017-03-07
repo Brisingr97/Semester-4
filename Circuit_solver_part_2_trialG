@@ -1,0 +1,277 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include "struct.h"
+
+typedef struct node_main
+{
+    	int  net;
+		struct node_child *child;
+    	struct node_main *next;
+}node_main;
+node_main* head_of_list;
+typedef struct node_child{
+	circuit_component cir;
+	struct node_child* next;
+}node_child;
+
+typedef struct{
+	float R_part;
+	float C_part;
+}complex;
+
+
+//+++++++++++++++++++++++++++++++++
+int n=4;
+//n+2 because -1 is matched to 0 hence array size = 1
+//+++++++++++++++++++++++++++++++++
+
+complex* minus_complex(complex* one,complex* two){
+	complex* this = one;
+	this->R_part = this->R_part - two->R_part;
+	this->C_part = this->C_part - two->C_part;
+	return this;
+}
+complex* add_complex(complex* one,complex* two){
+	complex* this = one;
+	this->R_part = this->R_part + two->R_part;
+	this->C_part = this->C_part + two->C_part;
+	return this;
+}
+//+++++++++++++++++++++++++++++++++++++++++MUSKAAN CODE++++++++++++++++++++++++++++++++++
+//things you need to know : 1) there is a zero complex number called "zero" = 0.0 + 0.0i
+//2) all values are to be taken float . preferably.
+//nodech is now node_child and nodemain is now node_main... DUH!
+
+complex* ret_zero(){
+
+	complex* zero = (complex*)malloc(sizeof(complex));
+	zero->R_part=0;
+	zero->C_part=0;
+	return zero;
+
+}
+
+int find_n_plus_two(){
+	//take the head main and return the (maxima of all net number+2);
+	return 4;
+}
+
+complex* coefficient_finder(node_child* child_iterator){
+
+	complex* to_return = (complex*)(malloc)(sizeof(complex));
+	if(child_iterator->cir.type=='C'){
+
+		to_return->R_part = 0.0;
+		to_return->C_part =	-1/(child_iterator->cir.RLCval);
+	}
+	if(child_iterator->cir.type=='R'){
+
+		to_return->R_part=1/(child_iterator->cir.RLCval);
+		to_return->C_part=0.0;
+	}
+
+	else if(child_iterator->cir.type=='L'){
+
+		to_return->C_part=1/(child_iterator->cir.RLCval);
+		to_return->R_part=0.0;
+	}
+
+	return to_return;
+
+}
+
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+void print_complex(complex* a){
+	printf("%f %fi ",a->R_part,a->C_part );
+}
+complex** primary_array_of_coeff;
+complex*** secondary_array_of_coeff;
+
+
+void equation_maker(node_main* main_iterator){
+	node_child* child_iterator = main_iterator->child;
+	while(child_iterator!=NULL){
+
+		complex* to_put_in_value = coefficient_finder(child_iterator);
+		//printf("%f %f\n",to_put_in_value.R_part,to_put_in_value.C_part );
+		primary_array_of_coeff[main_iterator->net+1] = minus_complex(primary_array_of_coeff[main_iterator->net+1],to_put_in_value);
+
+		if(child_iterator->cir.from_net==main_iterator->net){
+
+			primary_array_of_coeff[child_iterator->cir.to_net+1]=add_complex(primary_array_of_coeff[child_iterator->cir.to_net+1],to_put_in_value);
+		
+		}
+		else {primary_array_of_coeff[child_iterator->cir.from_net+1]=add_complex(primary_array_of_coeff[child_iterator->cir.from_net+1],to_put_in_value);}
+		
+		//takes in a node_main and enters the coeff in respective row number of array;
+
+		child_iterator = child_iterator->next;}
+}
+
+
+// n is the maxima of all the input component num;
+
+void make_a_2_d_G_array(node_main* head_main,complex*** secondary_array_of_coeff){
+	//takes in a head node of type node_main and stores all the equations thus formed in the secondary array
+	//head_main is set as zero;
+	int i,k;
+	
+	for(i=0;i<n;i++){
+		for(k=0;k<n;k++)
+		{
+			secondary_array_of_coeff[i][k] = ret_zero();
+
+		}
+			primary_array_of_coeff[i]=ret_zero();
+	}//0 = 0 for headnode
+	node_main* main_iterator = head_main->next;
+	// for(i=0;i<n;i++){
+	// 	primary_array_of_coeff[i]=zero;
+	// }
+	//int which_net_number_mapped = 1;
+	while(main_iterator!=NULL){
+		equation_maker(main_iterator);
+		for(k=0;k<n;k++){
+			//print_complex(primary_array_of_coeff[k]);
+			secondary_array_of_coeff[main_iterator->net+1][k] = primary_array_of_coeff[k];
+		}
+		main_iterator = main_iterator->next;
+	}
+
+}
+
+
+int main(){
+
+	int n = find_n_plus_two();
+
+	primary_array_of_coeff = (complex**)malloc(sizeof(complex)*n);
+
+	secondary_array_of_coeff = malloc(sizeof(complex **));	
+	int i;
+	for(i=0;i<n;i++){
+		secondary_array_of_coeff[i] = malloc(sizeof(complex*));
+	}
+
+	////");
+				circuit_component resistor_1;
+				circuit_component capacitor_1;
+				circuit_component current_source_1;
+				circuit_component resistor_2;
+				//
+				resistor_1.type = 'R';
+				resistor_1.type_num = 1;
+				resistor_1.from_net = -1;
+				resistor_1.to_net = 1; //no zero
+				resistor_1.RLCval = 10.0;
+				resistor_1.DC_offset = 0.0;
+				resistor_1.amp = 0.0;
+				resistor_1.freq = 0.0;
+				resistor_1.delay=0.0;
+				resistor_1.damp=0.0;
+				resistor_1.RLCdenom="K";
+				resistor_1.freqdenom="Hz";
+
+				resistor_2.type = 'R';
+				resistor_2.type_num = 1;
+				resistor_2.from_net = 1;
+				resistor_2.to_net = 2; //no zero
+				resistor_2.RLCval = 10.0;
+				resistor_2.DC_offset = 0.0;
+				resistor_2.amp = 0.0;
+				resistor_2.freq = 0.0;
+				resistor_2.delay=0.0;
+				resistor_2.damp=0.0;
+				resistor_2.RLCdenom="K";
+				resistor_2.freqdenom="Hz";
+
+				capacitor_1.type = 'C';
+				capacitor_1.type_num = 1;
+				capacitor_1.from_net = 2;
+				capacitor_1.to_net = -1; //no zero
+				capacitor_1.RLCval = 10.0;
+				capacitor_1.DC_offset = 0.0;
+				capacitor_1.amp = 0.0;
+				capacitor_1.freq = 0.0;
+				capacitor_1.delay=0.0;
+				capacitor_1.damp=0.0;
+				capacitor_1.RLCdenom="NF";
+				capacitor_1.freqdenom="Hz";
+
+				current_source_1.type = 'I';
+				current_source_1.type_num = 1;
+				current_source_1.from_net = 1;
+				current_source_1.to_net = 2; //no zero
+				current_source_1.RLCval = 0.0;
+				current_source_1.DC_offset = 0.0;
+				current_source_1.amp = 1.0;
+				current_source_1.freq = 10.0;
+				current_source_1.delay=0.0;
+				current_source_1.damp=0.0;
+				current_source_1.RLCdenom="NF";
+				current_source_1.freqdenom="Khz";
+				////");
+				head_of_list = (node_main*)malloc(sizeof(node_main));
+				head_of_list->net = -1;
+				//also have to send the required frequency of each source into C and L to find Xc and Xl
+				node_child* capacitor_1_ch = (node_child*)malloc(sizeof(node_child));
+				node_child* resistor_1_ch = (node_child*)malloc(sizeof(node_child));
+				capacitor_1_ch->cir = capacitor_1;
+				capacitor_1_ch->next = resistor_1_ch;
+				resistor_1_ch->cir = resistor_1;
+				resistor_1_ch->next = NULL;
+				head_of_list->child = capacitor_1_ch;
+
+				
+				head_of_list->next = (node_main*)malloc(sizeof(node_main));
+				head_of_list->next->net = 1;
+//");
+				node_child* resistor_1_ch_2 = (node_child*)malloc(sizeof(node_child));
+				node_child* resistor_2_ch = (node_child*)malloc(sizeof(node_child));
+				node_child* current_source_ch = (node_child*)malloc(sizeof(node_child));
+				current_source_ch->cir = current_source_1;
+				current_source_ch->next = NULL;
+				resistor_1_ch_2->next = resistor_2_ch;
+				resistor_2_ch->cir = resistor_2;
+				resistor_2_ch->next = current_source_ch;
+				resistor_1_ch_2->cir = resistor_1;
+				head_of_list->next->child = resistor_1_ch_2;
+//");			
+				head_of_list->next->next = (node_main*)malloc(sizeof(node_main));
+				head_of_list->next->next->net = 2;
+				node_child* current_source_ch_2 = (node_child*)malloc(sizeof(node_child));
+				node_child* resistor_2_ch_2 = (node_child*)malloc(sizeof(node_child));
+				node_child* capacitor_1_ch_2 = (node_child*)malloc(sizeof(node_child));
+				current_source_ch_2->cir = current_source_1;
+				current_source_ch_2->next = NULL;
+				capacitor_1_ch_2->cir = capacitor_1;
+				capacitor_1_ch_2->next = current_source_ch_2;
+				resistor_2_ch_2->cir = resistor_2;
+				resistor_2_ch_2->next = capacitor_1_ch_2;
+				head_of_list->next->next->child = resistor_2_ch_2;
+				head_of_list->next->next->next = (node_main*)malloc(sizeof(node_main));
+				head_of_list->next->next->next=NULL;
+
+				// node_child* resistor_1_ch = (node_child*)malloc(sizeof(node_child));
+				// node_child* resistor_2_ch = (node_child*)malloc(sizeof(node_child));
+				// node_child* capacitor_1_ch = (node_child*)malloc(sizeof(node_child));
+				// node_child* current_source_1_ch = (node_child*)malloc(sizeof(node_child));
+				//");
+
+				make_a_2_d_G_array(head_of_list,secondary_array_of_coeff);
+				int s,b;
+				s=0;
+				b=0;
+				//");
+				while(b<n){
+					s=0;
+					while(s<n){
+						printf("   [");print_complex(secondary_array_of_coeff[b][s]);printf("]   ");
+						s++;
+					}
+					printf("\n");
+					b++;
+				}
+}
