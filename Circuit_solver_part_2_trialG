@@ -2,276 +2,503 @@
 #include <stdlib.h>
 #include <math.h>
 #include "struct.h"
+#include "inv.h"
 
-typedef struct node_main
+extern int screenx,screeny,endx,endy;
+
+extern int count;
+extern int compc;
+int check_net=0;
+
+struct nodemain
 {
     	int  net;
-		struct node_child *child;
-    	struct node_main *next;
-}node_main;
-node_main* head_of_list;
-typedef struct node_child{
+		struct nodech *child;
+    	struct nodemain *next;
+};
+
+struct nodech{
 	circuit_component cir;
-	struct node_child* next;
-}node_child;
+	struct nodech* next;
+};
 
-typedef struct{
-	float R_part;
-	float C_part;
-}complex;
+struct nodevis{
+	int  data;
+	int x,y;
+    struct nodevis *next;
+};
 
-
-//+++++++++++++++++++++++++++++++++
-int n=4;
-//n+2 because -1 is matched to 0 hence array size = 1
-//+++++++++++++++++++++++++++++++++
-
-complex* minus_complex(complex* one,complex* two){
-	complex* this = one;
-	this->R_part = this->R_part - two->R_part;
-	this->C_part = this->C_part - two->C_part;
-	return this;
+struct nodemain* push_main(struct nodemain** head, int net)
+{
+    if(check_net==1){
+	    struct nodemain* new_node = (struct nodemain*)malloc(sizeof(struct nodemain));
+	    new_node->net=net;
+	    new_node->child=NULL;
+	    new_node->next = (*head)->next;
+	    (*head)->next    = new_node;
+	    return new_node;	
+    }
+    else{
+	    if(net==-1)
+		check_net=1;
+	    struct nodemain* new_node = (struct nodemain*)malloc(sizeof(struct nodemain));
+	    new_node->net=net;
+	    new_node->child=NULL;
+	    new_node->next = (*head);
+	    (*head)    = new_node;
+	    return new_node;
+    }
 }
-complex* add_complex(complex* one,complex* two){
-	complex* this = one;
-	this->R_part = this->R_part + two->R_part;
-	this->C_part = this->C_part + two->C_part;
-	return this;
+
+void push_struct(struct nodech** head, circuit_component cir_comp)
+{
+    struct nodech* new_node = (struct nodech*)malloc(sizeof(struct nodech));
+    new_node->next = (*head);
+    new_node->cir  = cir_comp;
+    (*head)   	   = new_node;
 }
-//+++++++++++++++++++++++++++++++++++++++++MUSKAAN CODE++++++++++++++++++++++++++++++++++
-//things you need to know : 1) there is a zero complex number called "zero" = 0.0 + 0.0i
-//2) all values are to be taken float . preferably.
-//nodech is now node_child and nodemain is now node_main... DUH!
+
+void push_vis(struct nodevis** head,int net, int x,int y){
+    struct nodevis* new_node = (struct nodevis*)malloc(sizeof(struct nodevis));
+    new_node->next = (*head);
+    new_node->data = net;
+    new_node->x = x;
+    new_node->y = y;
+    (*head)    = new_node;
+}
+
+struct nodevis* search_vis(struct nodevis* head,int data){
+	struct nodevis* new_node=NULL;
+	new_node=head;
+	while(new_node!=NULL){
+		if(new_node->data==data)
+			return new_node;
+		new_node=new_node->next;
+	}
+	return NULL;
+}
+
+struct nodemain* search_main(struct nodemain* head,int data){
+	struct nodemain* new_node=head;
+	//printf("enters search main \n");
+	while(new_node!=NULL){
+		//printf("%d,%d",new_node->net,data);
+		if(new_node->net==data){
+			//printf("yes\n");
+			return new_node;
+		}
+		new_node=new_node->next;
+	}
+	return NULL;
+}
+
+int cmp_struct(circuit_component a,circuit_component b){
+
+	if(a.type!=b.type)
+		return 0;
+	if(a.type_num!=b.type_num)
+		return 0;
+	if(a.from_net!=b.from_net)
+		return 0;
+	if(a.to_net!=b.to_net)
+		return 0;
+	return 1;
+}
+
+struct nodech* search_child(struct nodemain* head,circuit_component data){
+	struct nodech* new_node=head->child;
+	while(new_node!=NULL){
+		if(cmp_struct(data,new_node->cir)==1)
+			return new_node;
+		new_node=new_node->next;
+	}
+	return NULL;
+}
+
+void add_to_graph(struct nodemain** headmain,circuit_component comp){
+
+	struct nodech* ch;
+	//printf("**%d**\n",comp.from_net);
+	struct nodemain* from_node=search_main((*headmain),comp.from_net);	
+	if(from_node==NULL){
+		count++;
+		from_node=push_main(headmain,comp.from_net);
+		//printf("\n\n&&  %d  &&\n\n",comp.from_net);
+	}
+	struct nodech* child1=search_child(from_node,comp);
+	if(child1==NULL){
+		ch=from_node->child;
+		push_struct(&ch,comp);
+		from_node->child=ch;
+	}
+
+	struct nodemain* to_node=search_main((*headmain),comp.to_net);	
+	if(to_node==NULL){
+		count++;
+		to_node=push_main(headmain,comp.to_net);
+		//printf("\n\n&&  %d  &&\n\n",comp.to_net);
+	}
+	child1=search_child(to_node,comp);
+	if(child1==NULL){
+		ch=to_node->child;
+		push_struct(&ch,comp);
+		to_node->child=ch;
+	}
+	compc++;
+}
+
+
+/*
+  <text x="10" y="20" style="fill:red;">Several lines:
+    <tspan x="10" y="45">First line.</tspan>
+    <tspan x="10" y="70">Second line.</tspan>
+  </text>
+*/
+
+void printplus(int x,int y){
+	printf("<text x=\"%d\" y=\"%d\" stroke = \"black\" font-size=\"20\">+</text>\n",x,y);
+}
+
+void printNet(int x,int y,int net){
+	if(net==-1)
+    		printf("<text x=\"%d\" y=\"%d\" stroke = \"red\" font-size=\"10\">Gnd</text>\n",x,y);
+	else
+    		printf("<text x=\"%d\" y=\"%d\" stroke = \"red\" font-size=\"10\">Net%d</text>\n",x,y,net);
+}
+
+void printRLC(int x,int y,char a,int RLCval,int val,char *s){
+
+	printf("<text x=\"%d\" y=\"%d\" stroke = \"red\" font-size=\"10\">%c%d %d%s</text>\n",x,y,a,RLCval,val,s);
+}
+
+void printVI(int x,int y,int a ,int b,int c,char* s,int d,int e){
+	printf("<text x=\"%d\" y=\"%d\" stroke = \"red\" font-size=\"10\">SINE ( %d %d %d%s %dS %d )</text>\n",x,y,a,b,c,s,d,e);
+}
+
+void draw_vcap(int x,int y,int c){			//sx=>start x, ex=>ending x 
+
+    printf("<path d=\"M %d,%d L %d, %d M %d,%d L %d, %d M %d,%d L %d, %d M %d,%d L %d, %d M %d,%d \" \n style=\" fill:none;fill-opacity:0.75;fill-rule:evenodd;stroke:#000000;stroke-width:2;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1\n\"/>\n",x,y,x,y-c,x-c,y-c,x+c,y-c,x-c,y-2*c,x+c,y-2*c ,x,y-2*c,x,y-3*c,x,y-3*c);
+
+endx=x;
+endy=y-3*c;
+
+}
+
+void draw_vind(int x,int y,int c){
+	printf("<path d=\"M %d,%d L %d,%d C %d,%d %d,%d %d,%d C %d,%d %d,%d %d,%d C %d,%d %d,%d %d,%d C %d,%d %d,%d %d,%d C %d,%d %d,%d %d,%d C %d,%d %d,%d %d,%d L %d,%d M %d,%d \" \n style=\" fill:none;fill-opacity:0.75;fill-rule:evenodd;stroke:#000000;stroke-width:2;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1\n\"/>\n",x,y,x,y-c,x,y-c, x+c/2,y-c, x+c/2,y-3*c/2,x+c/2,y-3*c/2, x+c/2,y-2*c, x,y-2*c,x,y-2*c, x+c/2,y-2*c, x+c/2,y-5*c/2,x+c/2,y-5*c/2, x+c/2,y-3*c, x,y-3*c,x,y-3*c, x+c/2,y-3*c, x+c/2,y-7*c/2,x+c/2,y-7*c/2, x+c/2,y-4*c, x,y-4*c,x,y-5*c,x,y-5*c);
+
+endx=x;
+endy=y-5*c;
+}
+
+void draw_vres(int x,int y,int c){
+
+	printf("<path d=\"M %d,%d L %d,%d L %d,%d L %d,%d L %d,%d L %d,%d L %d,%d M %d,%d \" \n style=\" fill:none;fill-opacity:0.75;fill-rule:evenodd;stroke:#000000;stroke-width:2;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1\n\"/>\n",x,y, x,y-c ,x+c/2,y-3*c/2, x,y-2*c ,x+c/2,y-5*c/2,x,y-3*c ,x,y-4*c,x,y-4*c);
+
+
+endx=x;
+endy=y-4*c;
+}
+
+
+void draw_cur(int x,int y,int c){
+
+	printf("<circle cx=\"%d\" cy=\"%d\" r=\"%d\" stroke=\"black\" stroke-width=\"1\" fill=\"white\" />\n",x,y-2*c,c);
+
+	printf("<polygon points=\"%d,%d %d,%d %d,%d \" style=\"fill:black;stroke:black;stroke-width:1\" />\n",x,y-8*c/3, x-c/2,y-2*c, x+c/2,y-2*c);
+
+	printf("<path d=\"M %d,%d L %d,%d M %d,%d L %d,%d M %d,%d L %d,%d M %d,%d \" \n style=\" fill:none;fill-opacity:0.75;fill-rule:evenodd;stroke:#000000;stroke-width:2;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1\n\"/>\n",x,y,x,y-c,x,y-4*c/3,x,y-8*c/3,x,y-3*c,x,y-4*c,x,y-4*c);
+
+endx=x;
+endy=y-4*c;
+}
+
+void draw_volt(int x,int y,int c){
+
+	printf("<circle cx=\"%d\" cy=\"%d\" r=\"%d\" stroke=\"black\" stroke-width=\"1\" fill=\"white\" />\n",x,y-2*c,c);
+
+	printf("<path d=\"C %d,%d %d,%d %d,%d C %d,%d %d,%d %d,%d C %d,%d %d,%d %d,%d C %d,%d %d,%d %d,%d \" \n style=\" fill:none;fill-opacity:0.75;fill-rule:evenodd;stroke:#000000;stroke-width:2;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1\n\"/>\n",x-c/2,y-2*c,x-c/2,y-5*c/2,x-c/4,y-5*c/2,x-c/4,y-5*c/2,x,y-5*c/2,x,y-2*c,x,y-2*c,x,y-3*c/2,x+c/4,y-3*c/2,x+c/4,y-3*c/2,x+c/2,y-3*c/2,x+c/2,y-2*c);
+
+	printf("<path d=\"M %d,%d L %d,%d M %d,%d L %d,%d M %d,%d \" \n style=\" fill:none;fill-opacity:0.75;fill-rule:evenodd;stroke:#000000;stroke-width:2;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1\n\"/>\n",x,y,x,y-c,x,y-3*c,x,y-4*c,x,y-4*c);
+
+	endx=x;
+	endy=y-4*c;
+}
+
+void dot(int x,int y,int c){
+	printf("<circle cx=\"%d\" cy=\"%d\" r=\"%d\" stroke=\"black\" stroke-width=\"1\" fill=\"black\" />\n",x,y,c);
+}
+
+void draw_line_to(int x,int y){
+	printf("<path d=\"L %d,%d \" \n style=\" fill:none;fill-opacity:0.75;fill-rule:evenodd;stroke:#000000;stroke-width:2;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1\n\"/>\n",x,y);
+}
+
+void draw_line(int x,int y,int x2,int y2){
+	printf("<path d=\"M %d,%d L %d,%d \" \n style=\" fill:none;fill-opacity:0.75;fill-rule:evenodd;stroke:#000000;stroke-width:2;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1\n\"/>\n",x,y,x2,y2);
+}
+
+
+void draw_graph(struct nodemain* headmain){
+	screenx=50*(compc+2);
+	screeny=50*(count+2);
+	int x=30;	
+	int y=screeny-10;
+	dot(x,y,5);
+	//printf("%d\n\n",y);
+	//dot(fp,x,y+250,60);
+	
+	int count_net=0;
+	int count_comp=0;
+	struct nodevis* vis=NULL;
+	struct nodevis* drawn=NULL;
+
+	struct nodemain* temp=headmain;
+
+	push_vis(&drawn,-1,x,y-50*count_net);
+	dot(x,y-50*count_net,5);
+	printNet(x-25,y-50*count_net-5,-1);
+	count_net++;
+
+	while(temp!=NULL){
+		if(temp->net!=-1){
+			push_vis(&drawn,temp->net,x,y-50*count_net);
+			dot(x,y-50*count_net,5);
+			printNet(x-25,y-50*count_net-5,temp->net);
+			count_net++;
+		}
+			temp=temp->next;
+	}
+
+
+
+	temp=headmain;
+	while(temp!=NULL){
+
+		int startx,starty;
+
+		struct nodevis* checkdr=search_vis(drawn,temp->net);
+		startx=checkdr->x;
+		starty=checkdr->y;
+		
+		push_vis(&vis,temp->net,x,y);
+	
+//	printf("\n");
+		int check_if_open=0;
+		struct nodech* tempch=temp->child;
+		while(tempch!=NULL){
+			check_if_open++;
+			int opp_net;
+			if(tempch->cir.from_net==temp->net)
+				opp_net=tempch->cir.to_net;
+			else opp_net=tempch->cir.from_net;
+			struct nodevis* opp_node=search_vis(vis,opp_net);
+			
+			if(opp_node==NULL){
+				opp_node=search_vis(drawn,opp_net);
+				int oppx=opp_node->x;
+				int oppy=opp_node->y;
+
+				int drawx=x+10+count_comp*50;
+				draw_line(startx,starty,drawx,starty);
+				char type=tempch->cir.type;
+				//printf("%c\n",type);
+				switch(type){
+					case 'R':	//printf("were you here?\n");
+							//printf("$$%s$$\n",tempch->cir.RLCdenom);
+							draw_vres(drawx,starty,10);
+							
+							if(strcmp(tempch->cir.RLCdenom,"ohm")){
+								printRLC(endx,endy+10,'R',tempch->cir.type_num,tempch->cir.RLCval,"");break;}
+							else printRLC(endx,endy+10,'R',tempch->cir.type_num,tempch->cir.RLCval,tempch->cir.RLCdenom);break;
+					case 'L':
+							draw_vind(drawx,starty,10);
+							printRLC(endx+3,endy+20,'L',tempch->cir.type_num,tempch->cir.RLCval,tempch->cir.RLCdenom);break;
+					case 'C':
+							draw_vcap(drawx,starty,10);
+							printRLC(endx,endy,'C',tempch->cir.type_num,tempch->cir.RLCval,tempch->cir.RLCdenom);break;
+					case 'V':	
+							draw_volt(drawx,starty,10);
+							printVI(endx,endy,tempch->cir.DC_offset,tempch->cir.amp,tempch->cir.freq,tempch->cir.freqdenom,tempch->cir.delay,tempch->cir.damp);
+							if(temp->net==(tempch->cir.from_net))
+								printplus(drawx,starty);
+							else printplus(endx+5,endy+15);
+							break;
+					case 'I':	//printf("here?");
+							draw_cur(drawx,starty,10);
+							printVI(endx,endy,tempch->cir.DC_offset,tempch->cir.amp,tempch->cir.freq,tempch->cir.freqdenom,tempch->cir.delay,tempch->cir.damp);
+							if(temp->net==(tempch->cir.from_net))
+								printplus(drawx,starty);
+							else printplus(endx+5,endy+15);				
+							break;
+
+				}
+				draw_line(endx,endy,drawx,oppy);
+				dot(drawx,oppy,5);
+				draw_line(drawx,oppy,oppx,oppy);
+				count_comp++;
+			}
+			tempch=tempch->next;
+
+		}
+		if(check_if_open==1){
+			fprintf(stderr,"open_circuit");
+			exit(0);
+		}
+		temp=temp->next;
+	}
+
+
+}
+
+complex* calc_impedance(circuit_component cir,float freq){
+	complex* c=malloc(sizeof(complex));
+	if(cir.type=='R'){
+		c->R_part = cir.RLCval;
+		c->C_part = 0 ;
+	}
+
+	else if(cir.type == 'C'){
+		c->C_part = -1/(cir.RLCval*freq);
+		c->R_part = 0;
+	}
+
+	else if(cir.type == 'L'){
+		c->C_part = cir.RLCval*freq;
+		c->R_part = 0;
+	}
+	return c;
+}
+
+
+void print_array(complex ***array_of_coeff,int n){
+	int i,j;
+	for(i =0 ; i < n; i++){
+		for(j =0 ; j < n; j++){
+
+			printf("[%f+i%f]" ,array_of_coeff[i][j]->R_part ,array_of_coeff[i][j]->C_part);
+
+		}
+		printf("\n");
+	}	
+
+}
 
 complex* ret_zero(){
 
-	complex* zero = (complex*)malloc(sizeof(complex));
-	zero->R_part=0;
-	zero->C_part=0;
-	return zero;
+	complex* real1=malloc(sizeof(complex));
+	real1->R_part=0;
+	real1->C_part=0;
+	return real1;
+}
+
+
+void add_to_eq(complex** primary_array_of_coeff ,int id ,complex* val){
+
+	primary_array_of_coeff[id]=add_complex(primary_array_of_coeff[id] ,val);
 
 }
 
-int find_n_plus_two(){
-	//take the head main and return the (maxima of all net number+2);
-	return 4;
+void add_to_seteqns(complex*** array_of_coeff, int from, complex** primary_array_of_coeff){
+
+	array_of_coeff[from]=primary_array_of_coeff;
+
 }
 
-complex* coefficient_finder(node_child* child_iterator){
+int search_volt_pos(int net, int* volts){
 
-	complex* to_return = (complex*)(malloc)(sizeof(complex));
-	if(child_iterator->cir.type=='C'){
+	int i=0;
+	for( i=0; i < count-1 ;i++){
 
-		to_return->R_part = 0.0;
-		to_return->C_part =	-1/(child_iterator->cir.RLCval);
-	}
-	if(child_iterator->cir.type=='R'){
-
-		to_return->R_part=1/(child_iterator->cir.RLCval);
-		to_return->C_part=0.0;
-	}
-
-	else if(child_iterator->cir.type=='L'){
-
-		to_return->C_part=1/(child_iterator->cir.RLCval);
-		to_return->R_part=0.0;
+		if(volts[i] == net)
+			return i;
 	}
 
-	return to_return;
-
+	return -2;								//default case
 }
 
-//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+void analyze(struct nodemain* headmain ,int n ,float freq ,complex*** array_of_coeff ,complex** RHS){
 
-void print_complex(complex* a){
-	printf("%f %fi ",a->R_part,a->C_part );
-}
-complex** primary_array_of_coeff;
-complex*** secondary_array_of_coeff;
+	struct nodemain* temp=headmain;
+	int gnd = temp->net;
+	temp=temp->next;
 
-
-void equation_maker(node_main* main_iterator){
-	node_child* child_iterator = main_iterator->child;
-	while(child_iterator!=NULL){
-
-		complex* to_put_in_value = coefficient_finder(child_iterator);
-		//printf("%f %f\n",to_put_in_value.R_part,to_put_in_value.C_part );
-		primary_array_of_coeff[main_iterator->net+1] = minus_complex(primary_array_of_coeff[main_iterator->net+1],to_put_in_value);
-
-		if(child_iterator->cir.from_net==main_iterator->net){
-
-			primary_array_of_coeff[child_iterator->cir.to_net+1]=add_complex(primary_array_of_coeff[child_iterator->cir.to_net+1],to_put_in_value);
-		
-		}
-		else {primary_array_of_coeff[child_iterator->cir.from_net+1]=add_complex(primary_array_of_coeff[child_iterator->cir.from_net+1],to_put_in_value);}
-		
-		//takes in a node_main and enters the coeff in respective row number of array;
-
-		child_iterator = child_iterator->next;}
-}
-
-
-// n is the maxima of all the input component num;
-
-void make_a_2_d_G_array(node_main* head_main,complex*** secondary_array_of_coeff){
-	//takes in a head node of type node_main and stores all the equations thus formed in the secondary array
-	//head_main is set as zero;
-	int i,k;
+	int volt[count-1];
+	int *volt_variables=volt;
+	int i=0,j;
 	
-	for(i=0;i<n;i++){
-		for(k=0;k<n;k++)
+	while(temp!=NULL){
+
+		volt_variables[i]=temp->net;
+		temp=temp->next;
+	}
+
+	temp=headmain;
+	temp=temp->next;
+
+	while(temp!=NULL){
+
+		int from=temp->net;
+
+		from = search_volt_pos(from, volt_variables);		
+		int to;
+		
+		complex** primary_array_of_coeff = (complex**)malloc(sizeof(complex)*n);
+		for (i = 0; i < count-1; ++i)
 		{
-			secondary_array_of_coeff[i][k] = ret_zero();
-
-		}
 			primary_array_of_coeff[i]=ret_zero();
-	}//0 = 0 for headnode
-	node_main* main_iterator = head_main->next;
-	// for(i=0;i<n;i++){
-	// 	primary_array_of_coeff[i]=zero;
-	// }
-	//int which_net_number_mapped = 1;
-	while(main_iterator!=NULL){
-		equation_maker(main_iterator);
-		for(k=0;k<n;k++){
-			//print_complex(primary_array_of_coeff[k]);
-			secondary_array_of_coeff[main_iterator->net+1][k] = primary_array_of_coeff[k];
 		}
-		main_iterator = main_iterator->next;
-	}
 
+		struct nodech* tempch=temp->child;
+		while(tempch!=NULL){
+
+			
+
+			complex* imp = calc_impedance(tempch->cir ,freq);
+			
+			to = tempch->cir.to_net;
+			if (to != gnd)
+				to = search_volt_pos(to, volt_variables);
+
+			complex* one = malloc(sizeof(complex));
+			one->R_part = 1;
+			one->C_part = 0;
+
+			complex* pos_constant = div_complex(one,imp);
+
+			complex* neg_constant = minus_complex(ret_zero(), pos_constant);
+	
+			add_to_eq(primary_array_of_coeff ,from ,neg_constant );			
+			if (to != gnd)		
+				add_to_eq(primary_array_of_coeff ,to ,pos_constant );		
+
+			tempch=tempch->next;
+
+		}
+
+		add_to_seteqns(array_of_coeff ,from ,primary_array_of_coeff);
+		temp=temp->next;
+	}				
+
+} 
+
+void printList(struct nodemain* node){
+	struct nodech* ch=node->child;
+	printf("** net name =%d**\n",node->net);
+	while(ch!=NULL){
+	printf("%c\n",ch->cir.type);//rlcvi
+	printf("%d\n",ch->cir.type_num);
+	printf("%d\n",ch->cir.from_net);
+	printf("%d\n",ch->cir.to_net);
+	printf("%f\n",ch->cir.RLCval);
+	printf("%f\n",ch->cir.DC_offset);
+	printf("%f\n",ch->cir.amp);
+	printf("%f\n",ch->cir.freq);
+	printf("%f\n",ch->cir.delay);
+	printf("%f\n",ch->cir.damp);
+
+	printf("\n\n");
+		
+	ch=ch->next;
+	}
 }
 
-
-int main(){
-
-	int n = find_n_plus_two();
-
-	primary_array_of_coeff = (complex**)malloc(sizeof(complex)*n);
-
-	secondary_array_of_coeff = malloc(sizeof(complex **));	
-	int i;
-	for(i=0;i<n;i++){
-		secondary_array_of_coeff[i] = malloc(sizeof(complex*));
-	}
-
-	////");
-				circuit_component resistor_1;
-				circuit_component capacitor_1;
-				circuit_component current_source_1;
-				circuit_component resistor_2;
-				//
-				resistor_1.type = 'R';
-				resistor_1.type_num = 1;
-				resistor_1.from_net = -1;
-				resistor_1.to_net = 1; //no zero
-				resistor_1.RLCval = 10.0;
-				resistor_1.DC_offset = 0.0;
-				resistor_1.amp = 0.0;
-				resistor_1.freq = 0.0;
-				resistor_1.delay=0.0;
-				resistor_1.damp=0.0;
-				resistor_1.RLCdenom="K";
-				resistor_1.freqdenom="Hz";
-
-				resistor_2.type = 'R';
-				resistor_2.type_num = 1;
-				resistor_2.from_net = 1;
-				resistor_2.to_net = 2; //no zero
-				resistor_2.RLCval = 10.0;
-				resistor_2.DC_offset = 0.0;
-				resistor_2.amp = 0.0;
-				resistor_2.freq = 0.0;
-				resistor_2.delay=0.0;
-				resistor_2.damp=0.0;
-				resistor_2.RLCdenom="K";
-				resistor_2.freqdenom="Hz";
-
-				capacitor_1.type = 'C';
-				capacitor_1.type_num = 1;
-				capacitor_1.from_net = 2;
-				capacitor_1.to_net = -1; //no zero
-				capacitor_1.RLCval = 10.0;
-				capacitor_1.DC_offset = 0.0;
-				capacitor_1.amp = 0.0;
-				capacitor_1.freq = 0.0;
-				capacitor_1.delay=0.0;
-				capacitor_1.damp=0.0;
-				capacitor_1.RLCdenom="NF";
-				capacitor_1.freqdenom="Hz";
-
-				current_source_1.type = 'I';
-				current_source_1.type_num = 1;
-				current_source_1.from_net = 1;
-				current_source_1.to_net = 2; //no zero
-				current_source_1.RLCval = 0.0;
-				current_source_1.DC_offset = 0.0;
-				current_source_1.amp = 1.0;
-				current_source_1.freq = 10.0;
-				current_source_1.delay=0.0;
-				current_source_1.damp=0.0;
-				current_source_1.RLCdenom="NF";
-				current_source_1.freqdenom="Khz";
-				////");
-				head_of_list = (node_main*)malloc(sizeof(node_main));
-				head_of_list->net = -1;
-				//also have to send the required frequency of each source into C and L to find Xc and Xl
-				node_child* capacitor_1_ch = (node_child*)malloc(sizeof(node_child));
-				node_child* resistor_1_ch = (node_child*)malloc(sizeof(node_child));
-				capacitor_1_ch->cir = capacitor_1;
-				capacitor_1_ch->next = resistor_1_ch;
-				resistor_1_ch->cir = resistor_1;
-				resistor_1_ch->next = NULL;
-				head_of_list->child = capacitor_1_ch;
-
-				
-				head_of_list->next = (node_main*)malloc(sizeof(node_main));
-				head_of_list->next->net = 1;
-//");
-				node_child* resistor_1_ch_2 = (node_child*)malloc(sizeof(node_child));
-				node_child* resistor_2_ch = (node_child*)malloc(sizeof(node_child));
-				node_child* current_source_ch = (node_child*)malloc(sizeof(node_child));
-				current_source_ch->cir = current_source_1;
-				current_source_ch->next = NULL;
-				resistor_1_ch_2->next = resistor_2_ch;
-				resistor_2_ch->cir = resistor_2;
-				resistor_2_ch->next = current_source_ch;
-				resistor_1_ch_2->cir = resistor_1;
-				head_of_list->next->child = resistor_1_ch_2;
-//");			
-				head_of_list->next->next = (node_main*)malloc(sizeof(node_main));
-				head_of_list->next->next->net = 2;
-				node_child* current_source_ch_2 = (node_child*)malloc(sizeof(node_child));
-				node_child* resistor_2_ch_2 = (node_child*)malloc(sizeof(node_child));
-				node_child* capacitor_1_ch_2 = (node_child*)malloc(sizeof(node_child));
-				current_source_ch_2->cir = current_source_1;
-				current_source_ch_2->next = NULL;
-				capacitor_1_ch_2->cir = capacitor_1;
-				capacitor_1_ch_2->next = current_source_ch_2;
-				resistor_2_ch_2->cir = resistor_2;
-				resistor_2_ch_2->next = capacitor_1_ch_2;
-				head_of_list->next->next->child = resistor_2_ch_2;
-				head_of_list->next->next->next = (node_main*)malloc(sizeof(node_main));
-				head_of_list->next->next->next=NULL;
-
-				// node_child* resistor_1_ch = (node_child*)malloc(sizeof(node_child));
-				// node_child* resistor_2_ch = (node_child*)malloc(sizeof(node_child));
-				// node_child* capacitor_1_ch = (node_child*)malloc(sizeof(node_child));
-				// node_child* current_source_1_ch = (node_child*)malloc(sizeof(node_child));
-				//");
-
-				make_a_2_d_G_array(head_of_list,secondary_array_of_coeff);
-				int s,b;
-				s=0;
-				b=0;
-				//");
-				while(b<n){
-					s=0;
-					while(s<n){
-						printf("   [");print_complex(secondary_array_of_coeff[b][s]);printf("]   ");
-						s++;
-					}
-					printf("\n");
-					b++;
-				}
-}
